@@ -1,0 +1,3 @@
+get_geom_xpos(): get geom postion
+get_geom_xvelp(): get velocity
+get_geom_xvelr():

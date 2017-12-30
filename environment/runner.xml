@@ -1,0 +1,76 @@
+<mujoco model='runner'>
+
+	<default>
+        <joint limited='true' damping='1' armature='0'/>
+        <geom contype='1' conaffinity='1' condim='1' rgba='0.8 0.6 .4 1'
+        	margin="0.001" solref=".02 1" solimp=".8 .8 .01" material="geom"/>
+        <motor ctrlrange='-.4 .4' ctrllimited='true'/>
+    </default>
+	
+	<option timestep='0.002' iterations="50" tolerance="1e-10" 
+		solver="Newton" jacobian="dense" cone="elliptic"/>
+		
+	
+	<asset>
+        <texture type="skybox" builtin="gradient" width="128" height="128" rgb1=".4 .6 .8" 
+            rgb2="0 0 0"/>  
+        <texture name="texgeom" type="cube" builtin="flat" mark="cross" width="127" height="1278" 
+            rgb1="0.8 0.6 0.4" rgb2="0.8 0.6 0.4" markrgb="1 1 1" random="0.01"/>  
+        <texture name="texplane" type="2d" builtin="checker" rgb1=".2 .3 .4" rgb2=".1 0.15 0.2" 
+            width="512" height="512"/>  
+
+        <material name='MatPlane' reflectance='0.3' texture="texplane" texrepeat="1 1" texuniform="true"/>
+        <material name='geom' texture="texgeom" texuniform="true"/>
+    </asset>
+	
+	<worldbody>
+        <geom name='floor' pos='0 0 0' size='5 5 .125' type='plane' material='MatPlane' condim='3'/>
+        
+        <body name='Tom' pos='0 0 1.4'>
+        	<freejoint name="root"/>
+        	
+        	<geom name='body' type='box' pos='0 0 0' size='.01 .01 .01'/>
+        	<geom name='bodyUp' type='box' pos='0 0 .1' size='.01 .01 .01'/>
+        	<geom name='bodyDown' type='box' pos='0 0 -.1' size='.01 .01 .01'/>
+        	<geom name='bodyLeft' type='box' pos='0 -.1 0' size='.01 .01 .01'/>
+        	<geom name='bodyRight' type='box' pos='0 .1 0' size='.01 .01 .01'/>
+        	
+        	<body name='leftLeg' pos='0 -.05 -.3'>
+        		<joint name='leftUp' pos = '0 -.05 -.05' axis='0 -1 0' type='hinge'
+        			range='-65 65' damping='5'/>
+        		<geom name='leftUpLeg' type='capsule' fromto='0 -.05 -.1 0 -.05 -.4' size='0.08'/>
+        		<body pos='0 0 -.45'>
+        			<joint name='leftLow' pos = '0 -.05 -.05' axis='0 -1 0' type='hinge'
+        				range='-105 0' damping='5'/>
+        			<geom name='leftLowLeg' type='capsule' fromto='0 -.05 -.1 0 -.05 -.4' size='0.06'/>
+        			<geom name='leftFeet' type='box' pos='.07 -.45 -.45' size='.15 .48 .05'
+        				friction='30 0 0'/>
+        		</body>
+        	</body>
+        	
+        	<body name='rightLeg' pos='0 .15 -.3'>
+        		<joint name='rightUp' pos = '0 -.05 -.05' axis='0 -1 0' type='hinge'
+        			range='-65 65' damping='5'/>
+        		<geom name='rightUpLeg' type='capsule' fromto='0 -.05 -.1 0 -.05 -.4' size='0.08'/>
+        		<body pos='0 0 -.45'>
+        			<joint name='rightLow' pos = '0 -.05 -.05' axis='0 -1 0' type='hinge'
+        				range='-105 0' damping='5'/>
+        			<geom name='rightLowLeg' type='capsule' fromto='0 -.05 -.1 0 -.05 -.4' size='0.06'/>
+        			<geom name='rightFeet'  type='box' pos='.07 .35 -.45' size='.15 .48 .05'
+        				friction='30 0 0'/>
+        		</body>
+        	</body>
+        	
+        </body>
+        
+	</worldbody>
+	
+	
+    <actuator>
+    	<motor name='leftUp'  		gear='1000' joint='leftUp' 	/>
+       	<motor name='rightUp'  		gear='1000' joint='rightUp' 	/>
+       	<motor name='leftLow'   	gear='-250' joint='leftLow' 	/>
+       	<motor name='rightLow' 		gear='-250' joint='rightLow' />
+    </actuator>
+	
+</mujoco>

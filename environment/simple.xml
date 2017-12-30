@@ -1,0 +1,18 @@
+<?xml version="1.0" ?>
+<mujoco>
+    <option timestep="0.005" />
+    <worldbody>
+    	<body name="robot" pos="0 0 0.5">
+     	   		<joint pos="0 0 1" damping="0.1" type="ball" name="ball0"/>
+       	   		<geom mass="1.0" pos="0 0 0" size="0.1 0.1 0.1" type="box" />
+        </body>
+        <body name="floor" pos="0 0 0.025">
+            <geom condim="3" size="1.0 1.0 0.02" rgba="0 1 0 1" type="box"/>
+        </body>
+    </worldbody>
+    
+    <actuator>
+        <motor gear="0 1 0" joint="ball0"/>
+    </actuator>
+</mujoco>
+
