@@ -24,9 +24,12 @@ class Simulator:
 		self.totReward = 0
 		self.rewardtimes = 0
 		self.resetTimes = 0
-		self.unit_dis = 0.3
+		self.unit_dis = 0.5
 		self.data['max_distance'] = 0
+		self.data['m_distance'] = 0
 		self.data['distance'] = 0
+		self.prog = 0
+		self.tot_prog = 0
 		
 	def _updateData(self, key, value):
 		'''Update the value for key and velocity for key.'''
@@ -43,7 +46,21 @@ class Simulator:
 	def takeAction(self, action):
 	
     	#0 is leftUp, 1 is rightUp, 2 is leftLow, 3 is rightLow
-    	
+		'''	
+    	if self.data['switch'] :
+    		self.sim.data.ctrl[0] = 0
+			self.sim.data.ctrl[1] = 0
+    		if action == 'Q':
+				self.sim.data.ctrl[0] = 1
+				self.sim.data.ctrl[1] = -1
+			if action == 'P':
+				self.sim.data.ctrl[0] = -1
+				self.sim.data.ctrl[1] = 1
+		else:
+			self.sim.data.ctrl[2] = 0
+			self.sim.data.ctrl[3] = 0
+		'''
+			
 		self.sim.data.ctrl[0] = 0
 		self.sim.data.ctrl[1] = 0
 		self.sim.data.ctrl[2] = 0
@@ -73,8 +90,11 @@ class Simulator:
 		self.averageDistance = self.totDistance/self.resetTimes;
 		self.data['max_distance'] = 0
 		self.data['distance'] = 0
+		self.data['m_distance'] = 0
 		self.sim.reset()
+		self.prog = 0
 		self.timer = 0
+		self.tot_prog = 0
 		
 	def resetTimer(self):
 		self.timer = 0
@@ -106,14 +126,31 @@ class Simulator:
 		cx, cy, cz = self.sim.data.get_geom_xpos('body')
 		
 		self.data['height'] = cz
-		self.data['max_distance'] = max(self.data['max_distance'], (int)(self.data['distance']/self.unit_dis))
+		
+		
 		self.data['distance'] = cx
+		
+		if abs(self.data['m_distance'] - self.data['distance']) > self.unit_dis :
+			if self.data['m_distance'] > self.data['distance']:
+				self.prog -= 1
+				self.tot_prog -= 1
+			else:
+				self.prog += 1
+				self.tot_prog += 1
+			self.data['m_distance'] = self.data['distance']
+			
+			
+		self.data['max_distance'] = max(self.data['max_distance'], (int)(self.data['distance']/self.unit_dis))
+		
 		#self.data['right_body'] = self.sim.data.get_geom_xpos('bodyRight')
 		#self.data['up_body'] =  self.sim.data.get_geom_xpos('bodyUp') 
 		#self.data['body_pos'] = self.sim.data.get_geom_xpos('body')
 		self.data['angle_bend'] = math.atan2(util.norm2d((ux-cx,uy-cy)),uz-cz)
 		self.data['angle_rotate'] = math.atan2(ry-cy,rx-cx) - math.pi/2
 		self.data['velocity'] = self.sim.data.get_geom_xvelp('body')[0]
+		self.data['vx'] = self.sim.data.get_geom_xvelp('body')[0]
+		self.data['vy'] = self.sim.data.get_geom_xvelp('body')[1]
+		self.data['vz'] = self.sim.data.get_geom_xvelp('body')[2]
 		self.data['angle_joint_rightup'] = self.sim.data.get_joint_qpos('rightUp')
 		self.data['angle_joint_rightup_v'] = self.sim.data.get_joint_qvel('rightUp')
 		self.data['angle_joint_leftup'] = self.sim.data.get_joint_qpos('leftUp')
@@ -124,9 +161,14 @@ class Simulator:
 		self.data['angle_joint_leftdown_v'] = self.sim.data.get_joint_qvel('leftLow')
 		self.data['avg_velocity'] = self.data['distance']/(self.timer+1e-5)*300
 		
+		self.data['switch'] = self.timer % 2
+		
 		#print(self.data['angle_joint_leftup_v'])
 		
-	def getDiscreteState(self):
+	def getState(self):
+		return self.data.copy()
+		
+	'''def getDiscreteState(self):
 		bend_unit = 0.5
 		rotate_unit = 0.5
 		angleup_unit = 0.3
@@ -161,22 +203,24 @@ class Simulator:
 		state['switch'] = self.timer % 2
 		#print(state)
 		
-		return tuple([x for x in state.items()])
+		return tuple([x for x in state.items()])'''
 		
 	def getReward(self, action):
 		reward = 0
 		if self.isDeath():
-			reward = -10
+			reward = -50
 		elif action == 'R':
 			reward = -99
 		else:
-			current =  (int) (self.data['distance']/self.unit_dis)
-			if current > self.data['max_distance']:
-				reward = 100
-			if current == self.data['max_distance']:
-				reward = 0
-			if current < self.data['max_distance']:
-				reward = current - self.data['max_distance'] + 1
+			#print(self.data['distance'], self.data['m_distance'])
+			reward = max(100 * self.prog, 10 * self.prog)
+			if reward > 0 and self.tot_prog >0:
+				reward *= self.tot_prog
+			self.prog = 0
+			'''if reward > 0 :
+				print("Go!!")
+			if reward <0:
+				print("Dawm!!")'''
 		
 		reward = reward
 		#print(reward)

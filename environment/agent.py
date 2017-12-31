@@ -2,18 +2,18 @@ import util
 import random
 import os
 import pickle	
+import numpy as np
 from game import Game
 
 class Agent:
 
-	def __init__(self, paramfile, alpha, epsilon, discount, mode, agentparam):
-		self.paramfile = paramfile
-		self.alpha = alpha
-		self.epsilon = epsilon
-		self.discount = discount
-		print(agentparam)
-		self.agentparam = util.Counter() + agentparam
+	def __init__(self, paramfile, mode, game, hparams, renew):
+		self.paramfile = paramfile + '.pickle'
+		#print(agentparam)
+		self.hparams = util.Counter() + hparams
 		self.mode = mode
+		self.game = game
+		self.renew = renew
 		
 	def loadParam(self):
 		pass
@@ -108,9 +108,6 @@ class QLearningAgent(Agent):
     def __init__(self, **args):
 		
         Agent.__init__(self, **args)
-    	
-        self.agentName = 'qLearningAgent'
-        
    
             
     def _updateQValue(self, stateAction, obj):
@@ -247,26 +244,6 @@ class MixQlAgent(QLearningAgent):
 			return random.choice(legalActions)
 		else:
 			return maxAction
-			
-class RateAgent(MixQlAgent):
-	
-	def getAction(self, state):
-    
-        legalActions = self.getLegalActions(state)
-        
-        if self.mode == 'Test':
-        	return self.computeActionFromQValues(state)
-        	
-        if len(legalActions)==0:
-        	return None
-        	
-        maxAction=self.computeActionFromQValues(state)
-        
-        if util.flipCoin(self.epsilon):
-        	return random.choice(legalActions)
-        else:
-        	return maxAction
-            
 	
 
 class TDnAgent(QLearningAgent):
@@ -308,68 +285,179 @@ class TDnAgent(QLearningAgent):
 		self.preRewards.append(reward)
 		
 
-class CrAcAgent(QLearningAgent):
+class CrAcAgent(Agent):
 	
          
 	def loadParam(self):
-    
-        self.qValues=util.Counter()
+	
+		self.qValues = util.Counter()
+		self.theta = np.random.randn(self.game.getDim() * self.game.getNumActions()) * 1e-2
         
-		if not os.path.isfile(self.paramfile):
+		if self.renew or not os.path.isfile(self.paramfile):
 			return
         
-        parameterFile = open(self.paramfile, 'rb')
+		parameterFile = open(self.paramfile, 'rb')
         
-        tmp = util.pickleLoad(parameterFile)
+		tmp = util.pickleLoad(parameterFile)
         
-        if tmp != None:
-        	self.qValues += tmp
-        parameterFile.close()
-    
-	def _getActionRate(self, state):
+		if tmp != None:
+			self.qValues += tmp
+		
+		tmp = util.pickleLoad(parameterFile)
+		
+		if np.any(tmp):
+			self.theta = tmp
+			
+		parameterFile.close()
+		
+	def __init__(self, **args):
+		Agent.__init__(self, **args)
+		
+		self.alpha = self.hparams['alpha']
+		self.beta = self.hparams['beta']
+		self.discount = self.hparams['discount']
+		self.epsilon = self.hparams['epsilon']
+        
+	def getScore(self, state, action):
 	
-		legalActions = self.getLegalActions(state)
+		#print("state:", state, " action:", action, "tensor:")
+		#print(self.game.tensorize(state, action))
+	
+		return (self.game.tensorize(state, action) * self.theta).sum()
 		
-		score = np.array([self._computeScore(state, action) for action in legalActions])
+	def _getPGrad(self, state, action):
 		
+		actionRate = self.getActionRate(state)
+		
+		#print(actionRate)
+		
+		return self.game.tensorize(state, action)\
+			   - sum([rate * self.game.tensorize(state, _action) for _action, rate in actionRate])
+    
+	def getActionRate(self, state):
+	
+		legalActions = self.game.getLegalActions(state)
+		
+		score = np.array([self.getScore(state, action) for action in legalActions])
+		
+		#print(score)
 		score = util.softmax(score)
 		
-		return [(logalActions[i], score[i]) for i in range(len(score))]
-        
-        	
+		
+		#print(score)
+		
+		return [(legalActions[i], score[i]) for i in range(len(score))]
+		
+	def getQValue(self, state, action):
+		#print(action, self.qValues[(self.game.discretize(state), action)])
+		return self.qValues[(self.game.discretize(state), action)]
+		
         
 	def computeValueFromQValues(self, state):
     
-		actionRate = self._getActionRate(state)
+		actionRate = self.getActionRate(state)
 		
-		return sum([rate * self.qValues[(state,action)] for action, rate in actionRate])
+		dState = self.game.discretize(state)
+		
+		return sum([rate * self.qValues[(dState,action)] for action, rate in actionRate])
 
 	def getAction(self, state):
-    	
-		actionRate = self._getActionRate(state)
         
+		#if self.mode == 'Train' and util.flipCoin(self.epsilon):
+		#	return random.choice(self.game.getLegalActions(state))
+        	
+		actionRate = self.getActionRate(state)
+		
 		p = random.random()
         
 		for action, rate in actionRate:
-        	if p < rate:
-        		return action
-        	p -= rate
+			if p < rate:
+				return action
+			p -= rate
         
 
 	def update(self, state, action, nextState, reward):
 	    
-		qValue = self.computeValueFromQValues(nextState)
-		self._updateQValue((state, action), reward + self.discount * qValue)
-        
-		self.theta += self.beta * self.qValue[(state, action)] * self._getPGrad(state, action)
+		value = self.computeValueFromQValues(nextState)
+		dState = self.game.discretize(state)
+		
+		self.qValues[(dState, action)] += self.alpha * (reward + self.discount * value - self.qValues[(dState, action)])
+		
+		#print(action, self.qValues[(self.game.discretize(state), action)])
+		
+		self.theta += self.beta * self.qValues[(dState, action)] * self._getPGrad(state, action)
 
 
-    def printParameter(self):
-        parameterFile = open(self.paramfile,'wb')
-        pickle.dump(self.qValues, parameterFile)
-        parameterFile.close()
+	def printParameter(self):
+		parameterFile = open(self.paramfile,'wb')
+		pickle.dump(self.qValues, parameterFile)
+		pickle.dump(self.theta, parameterFile)
+		parameterFile.close()
         
+
+class NaiveCrAcAgent(CrAcAgent):
+
+	def loadParam(self):
 	
+		self.qValues = util.Counter()
+		self.theta = util.Counter()
+        
+		if self.renew or not os.path.isfile(self.paramfile):
+			return
+        
+		parameterFile = open(self.paramfile, 'rb')
+        
+		tmp = util.pickleLoad(parameterFile)
+        
+		if tmp != None:
+			self.qValues += tmp
+		
+		tmp = util.pickleLoad(parameterFile)
+		
+		if tmp != None:
+			self.theta += tmp
+			
+		parameterFile.close()
+	
+	def getScore(self, dState, action):
+	
+		#print("state:", state, " action:", action, "tensor:")
+		#print(self.game.tensorize(state, action))
+	
+		return self.theta[(dState, action)]
+	
+	
+	def getActionRate(self, state):
+	
+		legalActions = self.game.getLegalActions(state)
+		
+		dState = self.game.discretize(state)
+		
+		score = np.array([self.getScore(dState, action) for action in legalActions])
+		
+		#print(score)
+		score = util.softmax(score)
+		
+		
+		#print(score)
+		
+		return [(legalActions[i], score[i]) for i in range(len(score))]
+		
+	
+	def update(self, state, action, nextState, reward):
+	    
+		value = self.computeValueFromQValues(nextState)
+		dState = self.game.discretize(state)
+		
+		self.qValues[(dState, action)] += self.alpha * (reward + self.discount * value - self.qValues[(dState, action)])
+		
+		self.theta[(dState, action)] += self.beta * self.qValues[(dState, action)]
+		
+		actionRate = self.getActionRate(state)
+		
+		for _action, rate in actionRate:
+			self.theta[(dState, _action)] -= self.beta * self.qValues[(dState, action)] * rate
+		
 		
 		
 class ApproximateQAgent(QLearningAgent):

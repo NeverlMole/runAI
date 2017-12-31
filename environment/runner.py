@@ -1,23 +1,26 @@
 '''
 Running code:
-python runner.py  [-a NAME] [-f FILEPATH] [--epsilon VALUE] [--alpha VALUE]  [--discount VALUE]
+python runner.py  [-a NAME] [-f FILEPATH] [-d] [-m Train/Test] [-p DICT] [-g NAME] [-v] [--renew]
 
 -a 				type of the agent	(runAgent, randomAgent, QLearningAgent, ApproximateQAgent
 									 TDnAgent)
--f 				file to store the parameter (../data/ql001.txt)
---epsilon		epsilon value for epsilon-greedy
---alpha			learning rate of agent
---discount		discount rate
+-f 				file to store the parameter (../data/ql001)
 --printrate		print the result after VALUE number of simulations
 -d 				display or not
 -m 				'Train' or 'Test'
 -p 				the parameter for different agent
+-g 				the kind of game
+-v				verbose
+
+--renew			renew the params
 
 --nboost		number of boosting
 
 Example command:
-python runner.py -a MixQlAgent -f ../data/mx001.pickle --epsilon 0.3 --alpha 0.1 --discount 0.9 \
---printrate 1000 -d -m Train -p {\'k\':5\,\'N\':100}
+python runner.py -a CrAcAgent -f ../data/ac001.pickle \
+--printrate 1000 -m Train \
+-p {\'discount\':0.9999\,\'alpha\':0.1\,\'beta\':0.1\,\'k\':5\,\'N\':100} \
+-g BasicGame
 ''' 
 
 from mujoco_py import load_model_from_xml, MjSim
@@ -28,7 +31,7 @@ import sys
 import agent
 import util
 from simulator import Simulator
-from game import Game
+import game
 
 '''version 1 of simulator
 class Simulator:
@@ -121,7 +124,10 @@ dictHparam = {'agent':'RunAgent',
 			  'printrate':10000,
 			  'display':False,
 			  'agentparam':'{}',
-			  'mode':'Train'}
+			  'mode':'Train',
+			  'verbose':False,
+			  'game':'BasicGame',
+			  'renew':False}
 			  
 for i in range(lenArgv):
 	if (sys.argv[i]=='-a'):
@@ -130,30 +136,27 @@ for i in range(lenArgv):
 	if (sys.argv[i]=='-f'):
 		dictHparam['paramfile'] = sys.argv[i+1]
 	
-	if (sys.argv[i]=='--epsilon'):
-		dictHparam['epsilon'] = float(sys.argv[i+1])
-	
-	
-	if (sys.argv[i]=='--alpha'):
-		dictHparam['alpha'] = float(sys.argv[i+1])
-		
-		
-	if (sys.argv[i]=='--discount'):
-		dictHparam['discount'] = float(sys.argv[i+1])
-	
-	if (sys.argv[i]=='--printrate'):
+	if sys.argv[i] == '--printrate':
 		dictHparam['printrate'] = int(sys.argv[i+1])
 		
 	
-	if (sys.argv[i]=='-m'):
+	if sys.argv[i] == '-m':
 		dictHparam['mode'] = sys.argv[i+1]	
 	
-	if (sys.argv[i]=='-d'):
-		dictHparam['display'] = True;
+	if sys.argv[i] == '-d':
+		dictHparam['display'] = True
 	
-	if (sys.argv[i]=='-p'):
+	if sys.argv[i] == '-p':
 		dictHparam['agentparam'] = eval(sys.argv[i+1])
+	
+	if sys.argv[i] == '-g':
+		dictHparam['game'] = sys.argv[i+1]
 		
+	if sys.argv[i] == '-v':
+		dictHparam['verbose'] = True
+	
+	if sys.argv[i] == '--renew':
+		dictHparam['renew'] = True
 
 print(dictHparam)
 		
@@ -164,17 +167,27 @@ mode = dictHparam['mode']
 
 t = 0
 
+game = getattr(game, dictHparam['game'])()
+
 agentClass = getattr(agent, dictHparam['agent'])
 
 agent = agentClass(paramfile=dictHparam['paramfile'], 
-				   epsilon=dictHparam['epsilon'],
-				   discount=dictHparam['discount'],
-				   alpha=dictHparam['alpha'],
-				   agentparam=dictHparam['agentparam'],
-				   mode=mode)
+				   hparams=dictHparam['agentparam'],
+				   mode=mode,
+				   game=game,
+				   renew=dictHparam['renew'])
 
 agent.loadParam()
-				    
+
+if dictHparam['renew']:
+	result_file = open(dictHparam['paramfile'] + '.txt', 'w')
+	result_file.write(repr('Num of Iterations').ljust(20) + \
+					  repr('Average Distance').ljust(25) + \
+					  repr('Average Reward').ljust(25) + \
+					  repr('Num of Reset').ljust(15)+'\n')
+					  
+else:
+	result_file = open(dictHparam['paramfile'] + '.txt', 'a')
 
 sim = Simulator(model, agent)
 
@@ -184,27 +197,33 @@ while True:
 	t+=1
 	sim.updateData()
 	
-	if sim.timer%9 == 0:
+	if sim.timer%11 == 0:
 		if sim.timer > 1 and mode == 'Train':
 			reward = sim.getReward(action);
-			nextState = sim.getDiscreteState()
+			nextState = sim.getState()
+			#print(state, action, nextState)
 			agent.update(state, action, nextState, reward)
 			
 		if sim.isDeath():
 			sim.reset()
 		
-		state = sim.getDiscreteState()
+		state = sim.getState()
 		action = agent.getAction(state)
+		
 		sim.takeAction(action)
 		
 		#print(action)
 		
-	if sim.timer%101 == 0 :
-		state = sim.getDiscreteState()
-		actions = Game.getLegalActions(state)
+	if dictHparam['verbose'] and sim.timer%101 == 0 :
+		state = sim.getState()
+		actions = game.getLegalActions(state)
 		print('At state :', state)
 		for action in actions:
-			print('Value of action ', action, ' is:', agent.getQValue(state, action))
+			print('Value of action ', action, ' is:', agent.getQValue(state, action), 
+					'and the score is:', agent.getScore(game.discretize(state), action))
+		
+		print(agent.getActionRate(state))
+			
 		
 	
 	if mode == 'Train' and (not (t%dictHparam['printrate'])):
@@ -212,6 +231,11 @@ while True:
 		print(t, 'average distance:', sim.averageDistance, 
 				'reset times:', sim.resetTimes)
 		print('averaged reward:', sim.totReward/sim.rewardtimes)
+		
+		result_file.write(repr(t).ljust(20) + \
+						  repr(sim.averageDistance).ljust(25) + \
+						  repr(sim.totReward/sim.rewardtimes).ljust(25) + \
+						  repr(sim.resetTimes).ljust(15) + '\n')
 		sim.resetTimer()
 	
 	sim.step()

@@ -6,6 +6,7 @@ except:
 import random
 import math
 import pickle
+import numpy as np
 
 def get_input():
 	try:
@@ -293,6 +294,13 @@ def pickleLoad(loadfile):
 		return pickle.load(loadfile)
 	except EOFError:
 		return None
+		
+def softmax(x):
+	x -= x.max()
+	
+	ex = np.exp(x)
+	
+	return ex / ex.sum()
 
 if __name__ == '__main__':
     a= Counter()
