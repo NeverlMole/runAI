@@ -67,8 +67,8 @@
 	
 	
     <actuator>
-    	<motor name='leftUp'  		gear='1000' joint='leftUp' 	/>
-       	<motor name='rightUp'  		gear='1000' joint='rightUp' 	/>
+    	<motor name='leftUp'  		gear='1500' joint='leftUp' 	/>
+       	<motor name='rightUp'  		gear='1500' joint='rightUp' 	/>
        	<motor name='leftLow'   	gear='-250' joint='leftLow' 	/>
        	<motor name='rightLow' 		gear='-250' joint='rightLow' />
     </actuator>

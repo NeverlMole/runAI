@@ -16,11 +16,11 @@ python runner.py  [-a NAME] [-f FILEPATH] [--epsilon VALUE] [--alpha VALUE]  [--
 --nboost		number of boosting
 
 Example command:
-python runner.py -a QLearningAgent -f ../data/ql001.pickle --epsilon 0.3 --alpha 0.1 --discount 0.9 \
---printrate 1000 -d -m Train -p {'k':5}
+python runner.py -a MixQlAgent -f ../data/mx001.pickle --epsilon 0.3 --alpha 0.1 --discount 0.9 \
+--printrate 1000 -d -m Train -p {\'k\':5\,\'N\':100}
 ''' 
 
-from mujoco_py import load_model_from_xml, MjSim, MjViewer, MjViewerBasic
+from mujoco_py import load_model_from_xml, MjSim
 import math
 import os
 import time
@@ -28,6 +28,7 @@ import sys
 import agent
 import util
 from simulator import Simulator
+from game import Game
 
 '''version 1 of simulator
 class Simulator:
@@ -183,7 +184,7 @@ while True:
 	t+=1
 	sim.updateData()
 	
-	if sim.timer%10 == 0:
+	if sim.timer%9 == 0:
 		if sim.timer > 1 and mode == 'Train':
 			reward = sim.getReward(action);
 			nextState = sim.getDiscreteState()
@@ -197,6 +198,13 @@ while True:
 		sim.takeAction(action)
 		
 		#print(action)
+		
+	if sim.timer%101 == 0 :
+		state = sim.getDiscreteState()
+		actions = Game.getLegalActions(state)
+		print('At state :', state)
+		for action in actions:
+			print('Value of action ', action, ' is:', agent.getQValue(state, action))
 		
 	
 	if mode == 'Train' and (not (t%dictHparam['printrate'])):

@@ -1,4 +1,5 @@
-from mujoco_py import load_model_from_xml, MjSim, MjViewer, MjViewerBasic
+from mujoco_py import load_model_from_xml, MjSim, MjViewer
+
 import math
 import os
 import time
@@ -7,11 +8,14 @@ import util
 from agent import *
 #from learningAgent import *
 
-class Simulator:
+class Simulator:	
 	
 	def __init__(self, model, agent):
 		self.sim = MjSim(model)
-		self.viewer = MjViewer(self.sim)
+		try:
+			self.viewer = MjViewer(self.sim)
+		except:
+			pass
 		self.agent = agent
 		self.timer = 0
 		self.data = {}
@@ -20,6 +24,9 @@ class Simulator:
 		self.totReward = 0
 		self.rewardtimes = 0
 		self.resetTimes = 0
+		self.unit_dis = 0.3
+		self.data['max_distance'] = 0
+		self.data['distance'] = 0
 		
 	def _updateData(self, key, value):
 		'''Update the value for key and velocity for key.'''
@@ -62,9 +69,10 @@ class Simulator:
 	def reset(self):
 		
 		self.resetTimes += 1;
-		self.totDistance += self.data['distance']
+		self.totDistance += self.data['max_distance']
 		self.averageDistance = self.totDistance/self.resetTimes;
-		
+		self.data['max_distance'] = 0
+		self.data['distance'] = 0
 		self.sim.reset()
 		self.timer = 0
 		
@@ -98,6 +106,7 @@ class Simulator:
 		cx, cy, cz = self.sim.data.get_geom_xpos('body')
 		
 		self.data['height'] = cz
+		self.data['max_distance'] = max(self.data['max_distance'], (int)(self.data['distance']/self.unit_dis))
 		self.data['distance'] = cx
 		#self.data['right_body'] = self.sim.data.get_geom_xpos('bodyRight')
 		#self.data['up_body'] =  self.sim.data.get_geom_xpos('bodyUp') 
@@ -149,6 +158,7 @@ class Simulator:
 		state['leftdown_angv'] = util.chunk(self.data['angle_joint_leftdown_v'],
 											anglevdown_unit, anglevdown_max)
 		
+		state['switch'] = self.timer % 2
 		#print(state)
 		
 		return tuple([x for x in state.items()])
@@ -156,14 +166,20 @@ class Simulator:
 	def getReward(self, action):
 		reward = 0
 		if self.isDeath():
-			reward = -1
+			reward = -10
 		elif action == 'R':
 			reward = -99
 		else:
-			reward = (100+self.data['distance']) * self.data['velocity']
-			
-		reward = -reward
+			current =  (int) (self.data['distance']/self.unit_dis)
+			if current > self.data['max_distance']:
+				reward = 100
+			if current == self.data['max_distance']:
+				reward = 0
+			if current < self.data['max_distance']:
+				reward = current - self.data['max_distance'] + 1
 		
+		reward = reward
+		#print(reward)
 		self.totReward += reward
 		self.rewardtimes += 1
 		

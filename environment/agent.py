@@ -2,7 +2,8 @@ import util
 import random
 import os
 import pickle	
-	
+from game import Game
+
 class Agent:
 
 	def __init__(self, paramfile, alpha, epsilon, discount, mode, agentparam):
@@ -10,6 +11,7 @@ class Agent:
 		self.alpha = alpha
 		self.epsilon = epsilon
 		self.discount = discount
+		print(agentparam)
 		self.agentparam = util.Counter() + agentparam
 		self.mode = mode
 		
@@ -21,9 +23,6 @@ class Agent:
 		
 	def update(self, state, action, nextstate, reward):
 		pass
-
-	def getLegalActions(self):
-		return ['P', 'W', 'O', 'S', 'Q']
 
 	def printParameter(self):
 		pass
@@ -127,17 +126,18 @@ class QLearningAgent(Agent):
     def computeValueFromQValues(self, state):
     
 
-        actions=self.getLegalActions()
-        if len(actions)==0: return 0
-        maxQValue=-1e5
+        actions = Game.getLegalActions(state)
+        if len(actions) == 0:
+        	return 0
+        maxQValue = -1e5
         for action in actions:
-            if self.getQValue(state,action)>maxQValue:
-                maxQValue=self.getQValue(state,action)
+            if self.getQValue(state, action) > maxQValue:
+                maxQValue = self.getQValue(state, action)
         return maxQValue
 
     def computeActionFromQValues(self, state):
     
-        actions=self.getLegalActions()
+        actions=Game.getLegalActions(state)
         if len(actions)==0: return None
         maxQValue=-1e15
         for action in actions:
@@ -148,7 +148,7 @@ class QLearningAgent(Agent):
 
     def getAction(self, state):
     
-        legalActions = self.getLegalActions()
+        legalActions = self.getLegalActions(state)
         
         if self.mode == 'Test':
         	return self.computeActionFromQValues(state)
@@ -190,7 +190,7 @@ class MixQlAgent(QLearningAgent):
 		
 		self.k = self.agentparam['k']
 		self.N = self.agentparam['N']
-
+	
 	def loadParam(self):
 
 		self.qValues=util.Counter()
@@ -223,7 +223,7 @@ class MixQlAgent(QLearningAgent):
 	
 	def getAction(self, state):
 	
-		legalActions = self.getLegalActions()
+		legalActions = Game.getLegalActions(state)
         
 		if self.mode == 'Test':
 			return self.computeActionFromQValues(state)
@@ -247,7 +247,25 @@ class MixQlAgent(QLearningAgent):
 			return random.choice(legalActions)
 		else:
 			return maxAction
+			
+class RateAgent(MixQlAgent):
 	
+	def getAction(self, state):
+    
+        legalActions = self.getLegalActions(state)
+        
+        if self.mode == 'Test':
+        	return self.computeActionFromQValues(state)
+        	
+        if len(legalActions)==0:
+        	return None
+        	
+        maxAction=self.computeActionFromQValues(state)
+        
+        if util.flipCoin(self.epsilon):
+        	return random.choice(legalActions)
+        else:
+        	return maxAction
             
 	
 
@@ -290,7 +308,68 @@ class TDnAgent(QLearningAgent):
 		self.preRewards.append(reward)
 		
 
+class CrAcAgent(QLearningAgent):
+	
+         
+	def loadParam(self):
+    
+        self.qValues=util.Counter()
+        
+		if not os.path.isfile(self.paramfile):
+			return
+        
+        parameterFile = open(self.paramfile, 'rb')
+        
+        tmp = util.pickleLoad(parameterFile)
+        
+        if tmp != None:
+        	self.qValues += tmp
+        parameterFile.close()
+    
+	def _getActionRate(self, state):
+	
+		legalActions = self.getLegalActions(state)
+		
+		score = np.array([self._computeScore(state, action) for action in legalActions])
+		
+		score = util.softmax(score)
+		
+		return [(logalActions[i], score[i]) for i in range(len(score))]
+        
+        	
+        
+	def computeValueFromQValues(self, state):
+    
+		actionRate = self._getActionRate(state)
+		
+		return sum([rate * self.qValues[(state,action)] for action, rate in actionRate])
 
+	def getAction(self, state):
+    	
+		actionRate = self._getActionRate(state)
+        
+		p = random.random()
+        
+		for action, rate in actionRate:
+        	if p < rate:
+        		return action
+        	p -= rate
+        
+
+	def update(self, state, action, nextState, reward):
+	    
+		qValue = self.computeValueFromQValues(nextState)
+		self._updateQValue((state, action), reward + self.discount * qValue)
+        
+		self.theta += self.beta * self.qValue[(state, action)] * self._getPGrad(state, action)
+
+
+    def printParameter(self):
+        parameterFile = open(self.paramfile,'wb')
+        pickle.dump(self.qValues, parameterFile)
+        parameterFile.close()
+        
+	
 		
 		
 class ApproximateQAgent(QLearningAgent):

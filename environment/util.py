@@ -1,5 +1,8 @@
 import signal
-from getch import getch
+try:
+	from getch import getch
+except:
+	pass
 import random
 import math
 import pickle
