@@ -4,6 +4,7 @@ The codes is in 'environment\' folder. The main code is 'runner.py'. The front o
 A sample training parameter file 'MCom_DeepQAgent_BasicGame.pam' is stored in 'data\' folder.  
 
 Our code is based on MuJoCo, py_mujoco and pytorch, so you should install these three packages before trying to run our codes.
+The install web page for py_mujoco is : 'https://github.com/openai/mujoco-py'
 
 To see the result of the sample parameters, run the following command:
 
