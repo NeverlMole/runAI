@@ -10,4 +10,10 @@ To see the result of the sample parameters, run the following command:
 
 python runner.py -a DeepQAgent -f ../data/MCom --printrate 10000 --countrate 10000 -m Train -p {\'discount\':0.9999\,\'epsilon\':0.01\,\'epoch\':500\,\'netsize\':\[100\,30\,100\,30\]\,\'batchsize\'\:1000000\,\'numbatch\'\:5\,\'gpu\':True\,\'lr\'\:0.001\,\'p\'\:0.5} -g BasicGame --model ./runner.xml -d
 
+To train a new deep Q-learing model, run the following command: 
+
+python runner.py -a DeepQAgent -f ../data/new --printrate 10000 --countrate 10000 -m Train -p {\'discount\':0.9999\,\'epsilon\':0.5\,\'epoch\':500\,\'netsize\':\[100\,30\,100\,30\]\,\'batchsize\'\:1000\,\'numbatch\'\:5\,\'gpu\':True\,\'lr\'\:0.001\,\'p\'\:0.5} -g BasicGame --model ./runner.xml --renew -d
+
+For discretized Q-learning, just change '-a DeepQAgent' to '-a QLearningAgent'. For discretized actor-critic, just change to '-a NaiveCrAcAgent'. 
+
 
