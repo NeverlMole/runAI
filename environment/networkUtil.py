@@ -44,7 +44,7 @@ def train(model, X, y, dtype, optimizer=optim.Adam, p=0.5,
 			#loss = loss_fn((scores.view(-1)-y_var).abs()**p, zeros)
 			tmp = (scores.view(-1)-y_var).abs()
 			tmp[tmp>1] = tmp[tmp>1]**p
-			print(tmp)
+			#print(tmp)
 			loss = tmp.mean()
 			#loss = loss.mean()
 			
