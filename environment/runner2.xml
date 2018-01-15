@@ -43,7 +43,7 @@
         			<joint name='leftLow' pos = '0 -.05 -.05' axis='0 -1 0' type='hinge'
         				range='-105 0' damping='5'/>
         			<geom name='leftLowLeg' type='capsule' fromto='0 -.05 -.1 0 -.05 -.4' size='0.06'/>
-        			<geom name='leftFeet' type='box' pos='.07 -.45 -.45' size='.15 .48 .05'
+        			<geom name='leftFeet' type='sphere' pos='0 -.05 -.45' size='.08'
         				friction='30 0 0'/>
         		</body>
         	</body>
@@ -56,7 +56,7 @@
         			<joint name='rightLow' pos = '0 -.05 -.05' axis='0 -1 0' type='hinge'
         				range='-105 0' damping='5'/>
         			<geom name='rightLowLeg' type='capsule' fromto='0 -.05 -.1 0 -.05 -.4' size='0.06'/>
-        			<geom name='rightFeet'  type='box' pos='.07 .35 -.45' size='.15 .48 .05'
+        			<geom name='rightFeet'  type='sphere' pos='0 -.05 -.45' size='.08'
         				friction='30 0 0'/>
         		</body>
         	</body>

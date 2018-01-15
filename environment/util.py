@@ -7,6 +7,11 @@ import random
 import math
 import pickle
 import numpy as np
+try:
+	import matplotlib.pyplot as plt 
+except:
+	pass
+
 
 def get_input():
 	try:
@@ -301,6 +306,28 @@ def softmax(x):
 	ex = np.exp(x)
 	
 	return ex / ex.sum()
+	
+
+def plot_figure(stats, title='', xlabel='', ylabel='',
+            savepath='./Figure/',
+            save_file='acc'):
+	"""
+    Print data in the coordinate. each entry in data is in the
+    form (x,y).
+    
+	Input: array of shape (N,2), 
+	"""
+	    
+	plt.cla()
+	for key, x in stats.items():
+		#print(x)
+		plt.plot(x, label=key)
+   
+	plt.title(title)
+	plt.xlabel(xlabel)	
+	plt.ylabel(ylabel)
+	plt.legend()
+	plt.savefig(savepath+save_file+'.png')
 
 if __name__ == '__main__':
     a= Counter()

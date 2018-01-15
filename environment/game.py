@@ -20,9 +20,12 @@ class BasicGame(Game):
 
 	def __init__(self):
 		self.actionList = ['P', 'Q', 'S', 'W', 'O']
-		self.dim = 14
+		self.dim = 20
 		self.actionDict = {self.actionList[i] : i for i in range(len(self.actionList))}
 		self.numActions = len(self.actionList)
+		self.actionStates = 2
+		self.real = {'P':[-10000, 10000, 0 ,0], 'Q':[10000, -10000, 0 , 0], 'O':[0, 0, 0, -10000], 'W':[0, 0, -10000, 0],
+					 'S':[0, 0, 0, 0]}
 
 	def getDim(self):
 		return self.dim
@@ -36,7 +39,7 @@ class BasicGame(Game):
 	def getLegalActions(self, state):
 		
 		#print(state)
-		if state['switch']:
+		if state['timer'] % 2:
 			return ['P', 'Q', 'S']
 		else:
 			return ['W', 'O', 'S']
@@ -75,12 +78,12 @@ class BasicGame(Game):
 		state['leftdown_angv'] = util.chunk(ori_state['angle_joint_leftdown_v'],
 											anglevdown_unit, anglevdown_max)
 		
-		state['switch'] = ori_state['switch']
+		state['switch'] = ori_state['timer'] % self.actionStates
 		#print(state)
 		
-		return tuple([x for x in state.items()])
+		return tuple([x for x in state.values()])
 		
-	def _tensorizeState(self, state):
+	def tensorizeState(self, state):
 		
 		tState = np.zeros(self.dim)
 		
@@ -98,11 +101,17 @@ class BasicGame(Game):
 		tState[11] = state['angle_joint_rightdown_v']
 		tState[12] = state['angle_joint_leftdown']
 		tState[13] = state['angle_joint_leftdown_v']
+		tState[14] = state['flx']
+		tState[15] = state['fly']
+		tState[16] = state['flz']
+		tState[17] = state['frx']
+		tState[18] = state['fry']
+		tState[19] = state['frz']
 		
 		return tState
 		
 	def tensorize(self, state, action):
-		tState = self._tensorizeState(state)
+		tState = self.tensorizeState(state)
 		
 		tmp = np.zeros(self.dim * self.numActions)
 		i = self.actionDict[action]
@@ -110,4 +119,46 @@ class BasicGame(Game):
 		tmp[i * self.dim: (i+1) * self.dim] = tState
 		
 		return tmp
+		
+	def realAction(self, action):
+		return self.real[action]
+		
+class FlexGame(BasicGame):
 	
+	def __init__(self):
+	
+		BasicGame.__init__(self)
+		self.actionList = ['P', 'Q', 'S', 'W', 'O', 'E', 'I']
+		
+		self.actionDict = {self.actionList[i] : i for i in range(len(self.actionList))}
+		self.numActions = len(self.actionList)
+		self.actionStates = 3
+		
+		self.real = {'P':[-10000, 10000, 0 ,0], 'Q':[10000, -10000, 0 , 0], 'O':[0, 0, 0, -10000], 'W':[0, 0, -10000, 0],
+					 'S':[0, 0, 0, 0], 'I':[0, 0, 0, 10000], 'E':[0, 0, 10000, 0]}
+		
+	def getLegalActions(self, state):
+		
+		#print(state)
+		if state['timer'] % 3 == 1:
+			return ['P', 'Q', 'S']
+		elif state['timer'] % 3 == 2:
+			return ['W', 'E', 'S']
+		else:
+			return ['O', 'I', 'S']
+			
+class SimpleGame(BasicGame):
+	def __init__(self):
+	
+		BasicGame.__init__(self)
+		
+		self.actionList = ['P', 'Q', 'S', 'W', 'O']
+		
+		self.actionDict = {self.actionList[i] : i for i in range(len(self.actionList))}
+		self.numActions = len(self.actionList)
+		self.actionStates = 2
+		
+		self.real = {'P':[-10000, 10000, 0, 0], 'Q':[10000, -10000, 0, 0], 'O':[0, 0, -30, 10000], 
+					 'W':[0, 0, 10000, -30], 'S':[0, 0, -300, -300]}			 
+	
+			

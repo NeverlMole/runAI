@@ -8,8 +8,8 @@ from game import Game
 class Agent:
 
 	def __init__(self, paramfile, mode, game, hparams, renew):
-		self.paramfile = paramfile + '.pickle'
-		#print(agentparam)
+		self.paramfile = paramfile + '_' + self.__class__.__name__ + '_' + game.__class__.__name__ +  '.pam'
+		print(self.paramfile)
 		self.hparams = util.Counter() + hparams
 		self.mode = mode
 		self.game = game
@@ -24,7 +24,7 @@ class Agent:
 	def update(self, state, action, nextstate, reward):
 		pass
 
-	def printParameter(self):
+	def saveParam(self):
 		pass
 
 	def getActionParameter(self, action):
@@ -94,7 +94,7 @@ class QLearningAgent(Agent):
     
         self.qValues=util.Counter()
         
-        if not os.path.isfile(self.paramfile):
+        if self.renew or not os.path.isfile(self.paramfile):
         	return
         
         parameterFile = open(self.paramfile, 'rb')
@@ -108,63 +108,82 @@ class QLearningAgent(Agent):
     def __init__(self, **args):
 		
         Agent.__init__(self, **args)
+        
+        self.alpha = self.hparams['alpha']
+        self.discount = self.hparams['dicount']
+        self.epsilon = self.hparams['epsilon']
+        self.agentname = 'QLearningAgent'
    
             
     def _updateQValue(self, stateAction, obj):
-    	self.qValues[stateAction] = (1 - self.alpha) * self.qValues[stateAction]\
+        self.qValues[stateAction] = (1 - self.alpha) * self.qValues[stateAction]\
         			+ self.alpha*obj
+        			
+        #print(stateAction)
 
 
     def getQValue(self, state, action):
+       
+       
+        dState = self.game.discretize(state)
+    
 
-        return self.qValues[(state,action)]
+        return self.qValues[(dState,action)]
 
 
     def computeValueFromQValues(self, state):
-    
 
-        actions = Game.getLegalActions(state)
+        actions = self.game.getLegalActions(state)
+        
         if len(actions) == 0:
         	return 0
-        maxQValue = -1e5
-        for action in actions:
-            if self.getQValue(state, action) > maxQValue:
-                maxQValue = self.getQValue(state, action)
-        return maxQValue
-
+        
+        dState = self.game.discretize(state)
+        
+        return max([self.qValues[(dState, action)] for action in actions])
+        
     def computeActionFromQValues(self, state):
     
-        actions=Game.getLegalActions(state)
+        actions = self.game.getLegalActions(state)
         if len(actions)==0: return None
         maxQValue=-1e15
-        for action in actions:
-            if self.getQValue(state,action)>maxQValue:
-                maxQValue=self.getQValue(state,action)
-                maxAction=action
-        return maxAction
+        
+        dState = self.game.discretize(state)
+        
+        #print(actions)
+        
+        maxValue = max([self.qValues[(dState, action)] for action in actions])
+
+        
+        maxActions = [action for action in actions if abs(self.qValues[(dState, action)]-maxValue) < 0.001]
+        
+        return random.choice(maxActions)
 
     def getAction(self, state):
     
-        legalActions = self.getLegalActions(state)
+        legalActions = self.game.getLegalActions(state)
         
         if self.mode == 'Test':
         	return self.computeActionFromQValues(state)
         	
-        if len(legalActions)==0:
-        	return None
-        	
-        maxAction=self.computeActionFromQValues(state)
-        
         if util.flipCoin(self.epsilon):
         	return random.choice(legalActions)
-        else:
-        	return maxAction
+        	
+        return self.computeActionFromQValues(state)
+        
+        	
+    def getScore(self, dState, action):
+    	return self.qValues[(dState, action)]
         
 
     def update(self, state, action, nextState, reward):
     
         maxQValue=self.computeValueFromQValues(nextState)
-        self._updateQValue((state,action), reward+self.discount*maxQValue)
+        dState = self.game.discretize(state)
+        
+        #print(reward+self.discount*maxQValue)
+        self._updateQValue((dState,action), reward+self.discount*maxQValue)
+        
 
     def getPolicy(self, state):
         return self.computeActionFromQValues(state)
@@ -172,7 +191,7 @@ class QLearningAgent(Agent):
     def getValue(self, state):
         return self.computeValueFromQValues(state)
 
-    def printParameter(self):
+    def saveParam(self):
         parameterFile = open(self.paramfile,'wb')
         pickle.dump(self.qValues, parameterFile)
         parameterFile.close()
@@ -185,8 +204,8 @@ class MixQlAgent(QLearningAgent):
 	def __init__(self, **args):
 		QLearningAgent.__init__(self, **args)
 		
-		self.k = self.agentparam['k']
-		self.N = self.agentparam['N']
+		self.k = self.hparams['k']
+		self.N = self.hparams['N']
 	
 	def loadParam(self):
 
@@ -211,7 +230,7 @@ class MixQlAgent(QLearningAgent):
 		#print('Here')
         	
     
-	def printParameter(self):
+	def saveParam(self):
 		parameterFile = open(self.paramfile,'wb')
 		pickle.dump(self.qValues, parameterFile)
 		pickle.dump(self.stateCounter, parameterFile)
@@ -220,7 +239,7 @@ class MixQlAgent(QLearningAgent):
 	
 	def getAction(self, state):
 	
-		legalActions = Game.getLegalActions(state)
+		legalActions = self.game.getLegalActions(state)
         
 		if self.mode == 'Test':
 			return self.computeActionFromQValues(state)
@@ -388,7 +407,7 @@ class CrAcAgent(Agent):
 		self.theta += self.beta * self.qValues[(dState, action)] * self._getPGrad(state, action)
 
 
-	def printParameter(self):
+	def saveParam(self):
 		parameterFile = open(self.paramfile,'wb')
 		pickle.dump(self.qValues, parameterFile)
 		pickle.dump(self.theta, parameterFile)
@@ -401,11 +420,18 @@ class NaiveCrAcAgent(CrAcAgent):
 	
 		self.qValues = util.Counter()
 		self.theta = util.Counter()
+
+		#print(self.paramfile)
+		  	
+		print(self.paramfile)
         
 		if self.renew or not os.path.isfile(self.paramfile):
 			return
+			
         
 		parameterFile = open(self.paramfile, 'rb')
+        
+		
         
 		tmp = util.pickleLoad(parameterFile)
         
@@ -457,8 +483,15 @@ class NaiveCrAcAgent(CrAcAgent):
 		
 		for _action, rate in actionRate:
 			self.theta[(dState, _action)] -= self.beta * self.qValues[(dState, action)] * rate
-		
-		
+
+class ConCrAcAgent(NaiveCrAcAgent):
+	
+	def getAction(self, state):
+        
+		#if self.mode == 'Train' and util.flipCoin(self.epsilon):
+		#	return random.choice(self.game.getLegalActions(state))
+        	
+		return self.getActionRate(state)
 		
 class ApproximateQAgent(QLearningAgent):
     """
@@ -521,7 +554,7 @@ class ApproximateQAgent(QLearningAgent):
         self.weights+=m.multiplyAll(self.alpha*difference)
         return None
 
-    def printParameter(self):
+    def saveParam(self):
         parameterFile = open(self.paramfile,'w')
         parameterFile.write(str(self.weights))
         return None

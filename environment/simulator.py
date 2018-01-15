@@ -10,7 +10,7 @@ from agent import *
 
 class Simulator:	
 	
-	def __init__(self, model, agent):
+	def __init__(self, model, agent, game):
 		self.sim = MjSim(model)
 		try:
 			self.viewer = MjViewer(self.sim)
@@ -30,6 +30,9 @@ class Simulator:
 		self.data['distance'] = 0
 		self.prog = 0
 		self.tot_prog = 0
+		self.sit_time = 0
+		self.sit_height = 1.1
+		self.game = game
 		
 	def _updateData(self, key, value):
 		'''Update the value for key and velocity for key.'''
@@ -60,28 +63,44 @@ class Simulator:
 			self.sim.data.ctrl[2] = 0
 			self.sim.data.ctrl[3] = 0
 		'''
-			
+		
+		#print(action)
+		
+		
+		self.sim.data.ctrl[0] = action[0]
+		self.sim.data.ctrl[1] = action[1]
+		self.sim.data.ctrl[2] = action[2]
+		self.sim.data.ctrl[3] = action[3]
+		return
+		
+		
 		self.sim.data.ctrl[0] = 0
 		self.sim.data.ctrl[1] = 0
 		self.sim.data.ctrl[2] = 0
 		self.sim.data.ctrl[3] = 0
 		
-		if action == 'Q':
-			self.sim.data.ctrl[0] = 1
-			self.sim.data.ctrl[1] = -1
-		elif action == 'W':
-			self.sim.data.ctrl[2] = -1
-		elif action == 'O':
-			self.sim.data.ctrl[3] = -1
-		elif action == 'P':
-			self.sim.data.ctrl[0] = -1
-			self.sim.data.ctrl[1] = 1
-		elif action == 'E':
-			self.sim.data.ctrl[2] = 1
-		elif action == 'U':
-			self.sim.data.ctrl[3] = 1
-		elif action == 'R':
-			self.reset()
+		action = [(action, 10000)]
+		
+		#print(action)
+		
+		for act, rate in action:
+		
+			if act == 'Q':
+				self.sim.data.ctrl[0] += rate
+				self.sim.data.ctrl[1] -= rate
+			elif act == 'W':
+				self.sim.data.ctrl[2] -= rate
+			elif act == 'O':
+				self.sim.data.ctrl[3] -= rate
+			elif act == 'P':
+				self.sim.data.ctrl[0] -= rate
+				self.sim.data.ctrl[1] += rate
+			elif act == 'E':
+				self.sim.data.ctrl[2] += rate
+			elif act == 'I':
+				self.sim.data.ctrl[3] += rate
+			elif act == 'R':
+				self.reset()
 			
 	def reset(self):
 		
@@ -112,7 +131,7 @@ class Simulator:
 		self.viewer.render()
 		
 	def isDeath(self):
-		return self.data['height']<0.3 or abs(self.data['angle_rotate'])>2  #\
+		return self.data['height']<0.3 or abs(self.data['angle_rotate'])>2 or self.sit_time > 3000 #\
 			   #or abs(self.data['angle_joint_leftup']) > 2 \
 			   
 			   #or abs(self.data['angle_joint_rightup']) > 2 \
@@ -124,8 +143,15 @@ class Simulator:
 		rx, ry, rz = self.sim.data.get_geom_xpos('bodyRight')
 		ux, uy, uz = self.sim.data.get_geom_xpos('bodyUp')
 		cx, cy, cz = self.sim.data.get_geom_xpos('body')
+		flx, fly, flz = self.sim.data.get_geom_xpos('leftFeet')
+		frx, fry, frz = self.sim.data.get_geom_xpos('rightFeet')
 		
 		self.data['height'] = cz
+		
+		if cz < self.sit_height:
+			self.sit_time += 1
+		else:
+			self.sit_time = 0
 		
 		
 		self.data['distance'] = cx
@@ -160,8 +186,14 @@ class Simulator:
 		self.data['angle_joint_leftdown'] = self.sim.data.get_joint_qpos('leftLow')
 		self.data['angle_joint_leftdown_v'] = self.sim.data.get_joint_qvel('leftLow')
 		self.data['avg_velocity'] = self.data['distance']/(self.timer+1e-5)*300
+		self.data['flx'] = flx - cx
+		self.data['fly'] = fly - cy
+		self.data['flz'] = flz - cz
+		self.data['frx'] = frx - cx
+		self.data['fry'] = fry - cy
+		self.data['frz'] = frz - cz
 		
-		self.data['switch'] = self.timer % 2
+		self.data['timer'] = self.timer
 		
 		#print(self.data['angle_joint_leftup_v'])
 		
@@ -214,8 +246,8 @@ class Simulator:
 		else:
 			#print(self.data['distance'], self.data['m_distance'])
 			reward = max(100 * self.prog, 10 * self.prog)
-			if reward > 0 and self.tot_prog >0:
-				reward *= self.tot_prog
+			# reward > 0 and self.tot_prog >0:
+			#	reward *= self.tot_prog
 			self.prog = 0
 			'''if reward > 0 :
 				print("Go!!")

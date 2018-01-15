@@ -7,3 +7,9 @@ ERROR: Could not open activation key file mjkey.txt
 Tue Dec  5 20:55:01 2017
 WARNING: Nan, Inf or huge value in QACC at DOF 2. The simulation is unstable. Time = 1.0120.
 
+Wed Jan  3 15:20:57 2018
+ERROR: Expired activation key
+
+Wed Jan  3 15:20:59 2018
+ERROR: Expired activation key
+

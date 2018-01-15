@@ -1,26 +1,48 @@
 '''
 Running code:
-python runner.py  [-a NAME] [-f FILEPATH] [-d] [-m Train/Test] [-p DICT] [-g NAME] [-v] [--renew]
+python runner.py  [-a NAME] [-f FILEPATH] [-d] [-m Train/Test] [-p DICT] [-g NAME] [-v] [--renew] [-s FILEPATH]
 
 -a 				type of the agent	(runAgent, randomAgent, QLearningAgent, ApproximateQAgent
 									 TDnAgent)
 -f 				file to store the parameter (../data/ql001)
 --printrate		print the result after VALUE number of simulations
+--countrate		iterations of each count
 -d 				display or not
 -m 				'Train' or 'Test'
 -p 				the parameter for different agent
 -g 				the kind of game
 -v				verbose
+--model			model		
 
 --renew			renew the params
 
 --nboost		number of boosting
 
 Example command:
-python runner.py -a CrAcAgent -f ../data/ac001.pickle \
---printrate 1000 -m Train \
--p {\'discount\':0.9999\,\'alpha\':0.1\,\'beta\':0.1\,\'k\':5\,\'N\':100} \
--g BasicGame
+
+
+python runner.py -a AcCAgent -f ../data/002 \
+--printrate 1000000 --countrate 10000 -m Train \
+-p {\'discount\':0.9999\,\'epsilon\':0.5\,} \
+-g BasicGame --model ./runner.xml --renew -v
+
+
+python runner.py -a DeepQAgent -f ../data/002 \
+--printrate 10000 --countrate 10000 -m Train \
+-p {\'discount\':0.9999\,\'epsilon\':0.5\,\'epoch\':10000\,\'netsize\':\[30\,30\,20\,10\]\,\'batchsize\'\:10000\,\'numbatch\'\:5\,\'gpu\':True} \
+-g BasicGame --model ./runner.xml --renew -v
+
+python runner.py -a DeepQAgent -f ../data/Com \
+--printrate 10000 --countrate 10000 -m Train \
+-p {\'discount\':0.9999\,\'epsilon\':0.5\,\'epoch\':500\,\'netsize\':\[100\,30\,100\,30\]\,\'batchsize\'\:10000\,\'numbatch\'\:5\,\'gpu\':True\,\'lr\'\:0.001\,\'p\'\:0.5} \
+-g BasicGame --model ./runner.xml --renew -v
+
+
+
+python runner.py -a deepModel -f ../data/001 \
+--printrate 10000 --countrate 10000 -m Train \
+-p {\'discount\':0.9999\,\'epsilon\':0.5\,\'epoch\':10000\,\'netsize\':\[30\,30\,20\,10\]\,\'batchsize\'\:10000\,\'numbatch\'\:5\,\'gpu\':True\,\'noiseWeight\'\:0.1\,\'miniBatchSize\'\:64\,\'targetRate\'\:0.01} \
+-g BasicGame --model ./runner.xml --renew -v
 ''' 
 
 from mujoco_py import load_model_from_xml, MjSim
@@ -32,6 +54,7 @@ import agent
 import util
 from simulator import Simulator
 import game
+import deepAgent
 
 '''version 1 of simulator
 class Simulator:
@@ -122,12 +145,14 @@ dictHparam = {'agent':'RunAgent',
 			  'alpha':0.1,
 			  'discount':0.2,
 			  'printrate':10000,
+			  'countrate':10000,
 			  'display':False,
 			  'agentparam':'{}',
 			  'mode':'Train',
 			  'verbose':False,
 			  'game':'BasicGame',
-			  'renew':False}
+			  'renew':False,
+			  'model':'runner.xml'}
 			  
 for i in range(lenArgv):
 	if (sys.argv[i]=='-a'):
@@ -157,19 +182,28 @@ for i in range(lenArgv):
 	
 	if sys.argv[i] == '--renew':
 		dictHparam['renew'] = True
+		
+	if sys.argv[i] == '--countrate':
+		dictHparam['countrate'] = eval(sys.argv[i+1])
+		
+	if sys.argv[i] == '--model':
+		dictHparam['model'] = str(sys.argv[i+1])
 
 print(dictHparam)
 		
 
 
-model = load_model_from_xml(open('./runner.xml', "r").read())
+model = load_model_from_xml(open(dictHparam['model'], "r").read())
 mode = dictHparam['mode']
 
 t = 0
 
 game = getattr(game, dictHparam['game'])()
 
-agentClass = getattr(agent, dictHparam['agent'])
+try:
+	agentClass = getattr(agent, dictHparam['agent'])
+except:
+	agentClass = getattr(deepAgent, dictHparam['agent'])
 
 agent = agentClass(paramfile=dictHparam['paramfile'], 
 				   hparams=dictHparam['agentparam'],
@@ -185,12 +219,12 @@ if dictHparam['renew']:
 					  repr('Average Distance').ljust(25) + \
 					  repr('Average Reward').ljust(25) + \
 					  repr('Num of Reset').ljust(15)+'\n')
-					  
-else:
-	result_file = open(dictHparam['paramfile'] + '.txt', 'a')
+	result_file.close()				  
+	
 
-sim = Simulator(model, agent)
+sim = Simulator(model, agent, game)
 
+ending = False
 ################################## End Init #######################################
 
 while True:
@@ -198,44 +232,56 @@ while True:
 	sim.updateData()
 	
 	if sim.timer%11 == 0:
+		if sim.timer > 1:
+			reward = sim.getReward(action)
 		if sim.timer > 1 and mode == 'Train':
-			reward = sim.getReward(action);
 			nextState = sim.getState()
 			#print(state, action, nextState)
-			agent.update(state, action, nextState, reward)
+			#print(reward)
+			if dictHparam['agent'] == 'DeepQAgent':
+				agent.update(state, action, reward, ending)
+			else:
+				agent.update(state, action, nextState, reward)
+			ending = False
+			#print(agent.getQValue(state, action))
 			
 		if sim.isDeath():
 			sim.reset()
+			ending = True
 		
 		state = sim.getState()
 		action = agent.getAction(state)
 		
-		sim.takeAction(action)
+		sim.takeAction(game.realAction(action))
 		
 		#print(action)
 		
-	if dictHparam['verbose'] and sim.timer%101 == 0 :
+	'''if dictHparam['verbose'] and sim.timer%101 == 0 :
 		state = sim.getState()
 		actions = game.getLegalActions(state)
 		print('At state :', state)
 		for action in actions:
-			print('Value of action ', action, ' is:', agent.getQValue(state, action), 
-					'and the score is:', agent.getScore(game.discretize(state), action))
+			print('Value of action ', action, ' is:', agent.getQValue(state, action))'''
 		
-		print(agent.getActionRate(state))
+		#print(agent.getActionRate(state))
 			
 		
 	
 	if mode == 'Train' and (not (t%dictHparam['printrate'])):
-		agent.printParameter()
+		agent.saveParam()
+		
+	if not (t % dictHparam['countrate']):
 		print(t, 'average distance:', sim.averageDistance, 
 				'reset times:', sim.resetTimes)
 		print('averaged reward:', sim.totReward/sim.rewardtimes)
 		
+		
+		result_file = open(dictHparam['paramfile'] + '.txt', 'a')
 		result_file.write(repr(t).ljust(20) + \
 						  repr(sim.averageDistance).ljust(25) + \
 						  repr(sim.totReward/sim.rewardtimes).ljust(25) + \
 						  repr(sim.resetTimes).ljust(15) + '\n')
+		result_file.close()
 		sim.resetTimer()
 	
 	sim.step()
