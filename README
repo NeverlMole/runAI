@@ -1,0 +1,12 @@
+The code is about training a biped robot to walk. 
+
+The codes is in environment folder. The main code is runner.py. The front of runner.py shows the usage of it. agent.py and deepAgent.py are the code for implementing different learning algorithm. game.py and simulator.py define the infrastructures. 
+A sample training parameter file M is stored in data folder.  
+
+Our code is based on MuJoCo, py_mujoco and pytorch, so you should install these three packages before trying to run our codes.
+
+To see the result of the sample parameters, run the following common:
+
+python runner.py -a DeepQAgent -f ../data/MCom --printrate 10000 --countrate 10000 -m Train -p {\'discount\':0.9999\,\'epsilon\':0.01\,\'epoch\':500\,\'netsize\':\[100\,30\,100\,30\]\,\'batchsize\'\:1000000\,\'numbatch\'\:5\,\'gpu\':True\,\'lr\'\:0.001\,\'p\'\:0.5} -g BasicGame --model ./runner.xml -d
+
+
